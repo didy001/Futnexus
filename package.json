@@ -1,0 +1,49 @@
+{
+  "name": "nexus•3c",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "lucide-react": "^0.554.0",
+    "@google/genai": "^1.30.0",
+    "recharts": "^3.5.0",
+    "react-dom": "^19.2.0",
+    "cors": "^2.8.5",
+    "@supabase/supabase-js": "^2.84.0",
+    "express": "^5.1.0",
+    "dotenv": "^17.2.3",
+    "winston": "^3.18.3",
+    "path": "^0.12.7",
+    "fs": "^0.0.1-security",
+    "child_process": "^1.0.2",
+    "util": "^0.12.5",
+    "chokidar": "^4.0.3",
+    "os": "^0.1.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "http": "^0.0.1-security",
+    "graphology": "^0.26.0",
+    "puppeteer": "^24.31.0",
+    "nodemailer": "^7.0.10",
+    "axios": "^1.13.2",
+    "ssh2": "^1.17.0",
+    "openai": "^6.9.1",
+    "systeminformation": "^5.27.11",
+    "vite": "^7.2.4",
+    "@vitejs/plugin-react": "^5.1.1",
+    "url": "^0.11.4",
+    "ethers": "^6.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

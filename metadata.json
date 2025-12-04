@@ -1,0 +1,5 @@
+{
+  "name": "Nexus•3C",
+  "description": "An autonomous enterprise orchestration system based on the Nexus+3C architecture. Features agent hierarchy management, intelligent pipelines, and a direct interface to the system kernel.",
+  "requestFramePermissions": []
+}
