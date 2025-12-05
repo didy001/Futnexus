@@ -1,3 +1,4 @@
+
 import puppeteer from 'puppeteer';
 import logger from './logger.js';
 import path from 'path';
@@ -21,18 +22,24 @@ class NetRunner {
     if (this.browser) return;
     
     // Launch with persistent user data dir to keep cookies/sessions alive
+    // STEALTH ARGUMENTS ADDED
     this.browser = await puppeteer.launch({
       headless: "new",
       userDataDir: this.userDataDir, 
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox',
+          '--disable-blink-features=AutomationControlled', // CRITICAL: Hides "Chrome is being controlled..."
+          '--disable-infobars',
+          '--window-size=1920,1080'
+      ],
+      ignoreDefaultArgs: ['--enable-automation'] // Hides automation flag
     });
-    logger.info('[NET RUNNER] Chrome Instance Launched (Persistent Identity).');
+    logger.info('[NET RUNNER] Chrome Instance Launched (Stealth Identity).');
   }
 
   /**
    * Connects to a URL, interacts, and returns data or a screenshot.
-   * @param {string} url 
-   * @param {object} actions - { waitForSelector, click, type, screenshot: boolean }
    */
   async scriptConnect(url, actions = {}) {
     logger.info(`[NET RUNNER] ⚡ Executing Active Connection to: ${url}`);
@@ -40,46 +47,44 @@ class NetRunner {
     await this.launchBrowser();
     const page = await this.browser.newPage();
     
-    // Set a realistic viewport and user agent to avoid bot detection
+    // EVASION: Randomize User Agent
+    const agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+    ];
+    await page.setUserAgent(agents[Math.floor(Math.random() * agents.length)]);
     await page.setViewport({ width: 1920, height: 1080 });
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+    // EVASION: Mask Webdriver property
+    await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
 
     try {
       await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
       // --- INTERACTION SCRIPTING ---
-      
-      // 1. Wait for specific element?
       if (actions.waitForSelector) {
-        logger.info(`[NET RUNNER] Waiting for selector: ${actions.waitForSelector}`);
         await page.waitForSelector(actions.waitForSelector, { timeout: 10000 });
       }
 
-      // 2. Click interaction?
       if (actions.click) {
-        logger.info(`[NET RUNNER] Clicking: ${actions.click}`);
         await page.click(actions.click);
-        // Wait for navigation/reaction
         await new Promise(r => setTimeout(r, 2000));
       }
 
-      // 3. Type interaction? (e.g. Login form)
       if (actions.type) {
-         // Expects array: [{selector: '#user', text: 'shadows'}, {selector: '#pass', text: '...'}]
          for (const input of actions.type) {
-             logger.info(`[NET RUNNER] Typing into ${input.selector}`);
              await page.type(input.selector, input.text, { delay: 100 });
          }
       }
 
-      // 4. Capture Screenshot?
       let screenshotPath = null;
       if (actions.screenshot) {
         const timestamp = Date.now();
         const safeName = url.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
         screenshotPath = path.join(this.screenshotDir, `${safeName}_${timestamp}.png`);
         
-        // Ensure dir exists (lazy init)
         const fsPromises = await import('fs/promises');
         await fsPromises.mkdir(this.screenshotDir, { recursive: true });
 
@@ -87,7 +92,6 @@ class NetRunner {
         logger.info(`[NET RUNNER] 📸 Visual Proof Saved: ${screenshotPath}`);
       }
 
-      // 5. Extract Content (Advanced)
       const content = await page.evaluate(() => document.body.innerText);
       const title = await page.title();
 
@@ -98,7 +102,7 @@ class NetRunner {
         title,
         content_length: content.length,
         screenshot: screenshotPath,
-        extracted_text: content.substring(0, 5000) // Truncate for AI context
+        extracted_text: content.substring(0, 5000)
       };
 
     } catch (error) {

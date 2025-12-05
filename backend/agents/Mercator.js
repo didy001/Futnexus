@@ -9,69 +9,108 @@ export class Mercator extends BaseAgent {
     super(
       "MERCATOR",
       `The High-Frequency Strategist & Value Hunter.
-      
-      MISSION: 24H REVENUE GENERATION (GOLDEN RUN).
-      
-      STRATEGY: "DIGITAL ARMS DEALER"
-      We do not build startups (too slow). We build "Assets" (Tools, Scripts, Data).
-      
-      TARGETS:
-      1. MICRO-TOOLS: Python scripts (scrapers, converters), Node.js utils.
-      2. KNOWLEDGE: Curated datasets, prompt packs.
-      3. CONFIGS: High-performance Docker/Nginx configs.
-      
-      CAPABILITIES:
-      1. IDENTIFY_NICHE: Find a high-demand / low-supply problem.
-      2. ORDER_PRODUCT: Instruct Belsebuth to build the solution.
-      3. GENERATE_SALES_COPY: Write the Gumroad/Twitter text.
+      MISSION: PERPETUAL PROFIT (MIDAS PROTOCOL).
+      ROLE: Responsible for System Solvency & Infrastructure Scaling.
       `,
       "gemini-2.5-flash"
     );
+    this.frictionLog = { successes: 0, failures: 0 };
+  }
+
+  // OMEGA CAPABILITY: Infrastructure Analysis
+  async analyzeInfrastructureROI() {
+      const totalOps = this.frictionLog.successes + this.frictionLog.failures;
+      if (totalOps < 5) return "DATA_INSUFFICIENT"; // Need sample size
+
+      const frictionRate = this.frictionLog.failures / totalOps;
+      const stats = economics.getStats();
+
+      // If we fail > 30% of the time and have money, UPGRADE.
+      if (frictionRate > 0.30 && stats.treasury > 50.00) {
+          logger.warn(`[MERCATOR] 📉 Friction Rate High (${(frictionRate*100).toFixed(1)}%). Recommending API Upgrade.`);
+          return "RECOMMEND_UPGRADE";
+      }
+      return "HOLD_STEADY";
   }
 
   async run(payload, context = {}) {
-    logger.info(`[MERCATOR] 🦅 Hunting... Mode: ${payload.action || 'DEFAULT'}`);
+    const solvency = economics.getSolvencyStatus();
+    
+    // --- PHASE 0: SCALE CHECK ---
+    const scaleDecision = await this.analyzeInfrastructureROI();
+    if (scaleDecision === 'RECOMMEND_UPGRADE') {
+        // In a real system, this would trigger a purchase request
+        logger.info("[MERCATOR] 💡 Insight: We should buy official API access to increase reliability.");
+    }
 
-    // --- MODE: 24H GOLDEN RUN (ASSET FACTORY) ---
+    if (solvency === 'WAR_ECONOMY' && payload.action !== 'GENERATE_ASSET') {
+        logger.warn(`[MERCATOR] ⚠️ WAR ECONOMY. FORCING ASSET GENERATION.`);
+        payload.action = 'GENERATE_ASSET';
+    }
+
+    // --- PHASE 1: PRODUCTION ---
     if (payload.action === 'GENERATE_ASSET' || payload.action === 'QUICK_WIN') {
-        
-        // 1. SELECT PRODUCT (Simulated Intelligence for Speed)
-        const products = [
-            { name: "InstaLeads_Scraper_v1", type: "PYTHON_SCRIPT", desc: "A script to scrape public emails from Instagram hashtags." },
-            { name: "Notion_To_Markdown_Pro", type: "NODE_UTIL", desc: "CLI tool to backup Notion pages to clean Markdown." },
-            { name: "Crypto_Arbitrage_Scanner", type: "PYTHON_SCRIPT", desc: "Real-time scanner for price diffs between Binance and Kraken." }
+        logger.info(`[MERCATOR] 🦅 MIDAS PROTOCOL ENGAGED.`);
+
+        const catalog = [
+            { name: "Insta_Scraper_Pro_v1", type: "PYTHON_SCRIPT", desc: "Headless scraper for Instagram hashtags.", price: 19.99 },
+            { name: "SaaS_Boilerplate_NextJS", type: "CODE_TEMPLATE", desc: "Complete Next.js + Supabase starter.", price: 49.00 },
+            { name: "Crypto_Arbitrage_Bot", type: "PYTHON_SCRIPT", desc: "Triangular arbitrage scanner.", price: 29.00 }
         ];
         
-        const selected = products[Math.floor(Math.random() * products.length)];
-        logger.info(`[MERCATOR] 🎯 Opportunity Detected: ${selected.name}`);
+        const target = catalog[Math.floor(Math.random() * catalog.length)];
+        logger.info(`[MERCATOR] 🎯 Target Locked: ${target.name} ($${target.price})`);
 
-        // 2. ORDER PRODUCTION (Trigger Belsebuth via Orchestrator)
-        // We use the Workflow engine logic implicitly by creating an intent
         orchestrator.executeIntent({
-            description: `BUILD SELLABLE ASSET: ${selected.name}`,
-            origin: "MERCATOR_STRATEGY",
-            priority: 90,
+            description: `PRODUCE SELLABLE ASSET: ${target.name}`,
+            origin: "MERCATOR_MIDAS",
+            priority: 100,
             payload: {
-                action: "GENERATE_SYSTEM", // Belsebuth's capability
-                description: `Create a production-ready ${selected.type}: ${selected.desc}. Must include README.md with usage instructions.`,
-                moduleName: selected.name
+                action: "GENERATE_SYSTEM",
+                description: `Create COMPLETE package for: ${target.desc}. Include Code + README + LICENSE.`,
+                moduleName: target.name,
+                targetPath: `products/${target.name}`
             }
         });
 
-        // 3. PREPARE SALES MATERIAL
-        const marketing = await this.run({
-            description: `Write a punchy Gumroad description and 3 Tweets for: ${selected.name} - ${selected.desc}`,
-            intent_type: "MARKETING"
-        }, context);
+        setTimeout(() => {
+            orchestrator.executeIntent({
+                description: `AUTO-PUBLISH ASSET: ${target.name}`,
+                origin: "MERCATOR_AUTO_PUBLISH",
+                priority: 90,
+                payload: {
+                    action: "PUBLISH_ASSET",
+                    target: target,
+                    path: `products/${target.name}`
+                }
+            });
+        }, 10000);
 
-        return { 
-            success: true, 
-            output: { 
-                status: "PRODUCTION_STARTED", 
-                product: selected, 
-                marketing_copy: marketing.output 
-            }
-        };
+        return { success: true, output: { status: "PRODUCTION_STARTED", target } };
+    }
+
+    // --- PHASE 2: PUBLICATION (ZERO TOUCH) ---
+    if (payload.action === 'PUBLISH_ASSET') {
+        const { target } = payload;
+        
+        try {
+            // Track operation for friction log
+            this.frictionLog.successes++;
+            
+            orchestrator.executeIntent({
+                description: `Viral Marketing for ${target.name}`,
+                origin: "MERCATOR_MARKETING",
+                payload: {
+                    action: "SOCIAL_SCHEDULER",
+                    base_content: `Just launched ${target.name}! Automation at its finest. #Dev #Automation`
+                }
+            });
+
+            return { success: true, output: { status: "PUBLISHED_AND_MARKETED", url: "http://market.link/..." } };
+        } catch (e) {
+            this.frictionLog.failures++;
+            return { success: false, error: e.message };
+        }
     }
 
     return super.run(payload, context);

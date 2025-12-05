@@ -1,13 +1,13 @@
 {
   "name": "nexus-backend",
-  "version": "9.1.0-MCP-READY",
+  "version": "11.0.0-CIEL-OMNIPOTENT",
   "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "daemon": "pm2 start ecosystem.config.cjs",
-    "stop": "pm2 stop nexus-omega",
-    "logs": "pm2 logs nexus-omega"
+    "daemon": "pm2 start pm2.json",
+    "stop": "pm2 stop nexus-omega-core",
+    "logs": "pm2 logs nexus-omega-core"
   },
   "dependencies": {
     "express": "^4.18.2",

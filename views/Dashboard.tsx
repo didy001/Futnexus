@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { INITIAL_LOGS } from '../constants';
 import { SystemLog } from '../types';
 import { socketService } from '../services/socketService';
-import { Shield, Database, Globe, Zap, Activity, Cpu, Wallet, UploadCloud, Server } from 'lucide-react';
+import { Shield, Database, Globe, Zap, Activity, Cpu, Wallet, UploadCloud, Server, RefreshCw } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const [logs, setLogs] = useState<SystemLog[]>(INITIAL_LOGS);
@@ -20,7 +20,6 @@ const Dashboard: React.FC = () => {
   });
   
   const [isConnected, setIsConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [uplinkData, setUplinkData] = useState('');
   const [uplinkStatus, setUplinkStatus] = useState<'IDLE' | 'UPLOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
 
@@ -28,7 +27,7 @@ const Dashboard: React.FC = () => {
     socketService.connect((status: any) => {
         setIsConnected(true);
         if (status.metrics) setMetrics(status.metrics);
-        if (status.economics) setEconomics(status.economics); // Expecting new payload
+        if (status.economics) setEconomics(status.economics);
         if (status.logs && status.logs.length > 0) {
             setLogs(status.logs);
         }
@@ -69,7 +68,7 @@ const Dashboard: React.FC = () => {
   return (
     <div className="w-full h-full grid grid-cols-12 gap-6 overflow-y-auto pr-2 custom-scrollbar">
       
-      {/* LEFT: STATS */}
+      {/* LEFT: STATS & AUTOMATION STATUS */}
       <div className="col-span-3 flex flex-col gap-4">
           <div className="glass-panel p-4 rounded-lg flex items-center gap-4">
               <Activity className="w-5 h-5 text-emerald-400" />
@@ -79,11 +78,11 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
           <div className="glass-panel p-4 rounded-lg flex items-center gap-4">
-              <Server className="w-5 h-5 text-purple-400" />
+              <RefreshCw className="w-5 h-5 text-purple-400 animate-spin-slow" />
               <div>
-                  <div className="text-[10px] text-slate-500 font-mono">MODE</div>
+                  <div className="text-[10px] text-slate-500 font-mono">PIPELINE</div>
                   <div className="text-xs font-bold text-white flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span> HYBRID
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> ZERO-TOUCH
                   </div>
               </div>
           </div>
@@ -102,10 +101,8 @@ const Dashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* CENTER: INFINITY GAUNTLET & UPLINK */}
+      {/* CENTER: INFINITY GAUNTLET */}
       <div className="col-span-6 flex flex-col gap-6">
-          
-          {/* GAUNTLET */}
           <div className="relative h-[450px] flex items-center justify-center">
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="absolute w-[400px] h-[400px] rounded-full border border-cyan-900/30 animate-[spin-slow_60s_linear_infinite]"></div>
@@ -134,24 +131,24 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
 
-          {/* NEURAL UPLINK PANEL */}
+          {/* NEURAL UPLINK */}
           <div className="glass-panel p-4 rounded-lg flex flex-col gap-2">
               <div className="flex justify-between items-center">
                   <h3 className="text-xs font-mono text-white flex items-center gap-2">
                       <UploadCloud className="w-4 h-4 text-purple-400" /> 
-                      NEURAL UPLINK (DATA FEED)
+                      NEURAL UPLINK
                   </h3>
                   <span className={`text-[10px] font-bold ${uplinkStatus === 'SUCCESS' ? 'text-emerald-400' : 'text-slate-500'}`}>{uplinkStatus}</span>
               </div>
               <textarea 
                   className="w-full h-20 bg-black/40 border border-slate-700 rounded p-2 text-xs font-mono text-slate-300 outline-none focus:border-purple-500 transition-colors"
-                  placeholder="// PASTE CODE, STRATEGY, OR RAW DATA HERE..."
+                  placeholder="// INJECT RAW DATA OR STRATEGY..."
                   value={uplinkData}
                   onChange={(e) => setUplinkData(e.target.value)}
               />
               <div className="flex justify-end">
                   <button onClick={handleUplink} disabled={!uplinkData} className="bg-purple-900/30 hover:bg-purple-600/50 text-purple-200 text-xs font-mono px-4 py-1 rounded transition-all">
-                      TRANSMIT DATA
+                      TRANSMIT
                   </button>
               </div>
           </div>
@@ -163,24 +160,33 @@ const Dashboard: React.FC = () => {
               <h3 className="text-xs text-white font-bold mb-2 flex items-center gap-2"><Wallet className="w-4 h-4 text-emerald-400"/> TREASURY</h3>
               
               <div className="bg-slate-900/50 p-3 rounded border border-emerald-500/20">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">Shadow Vault (You)</span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">Shadow Vault (Locked)</span>
                   <div className="text-2xl font-bold text-emerald-400">${economics.vault.toFixed(2)}</div>
               </div>
 
               <div className="bg-slate-900/50 p-3 rounded border border-cyan-500/20">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">System Treasury (Ops)</span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">System Ops (Active)</span>
                   <div className="text-xl font-bold text-cyan-400">${economics.treasury.toFixed(2)}</div>
               </div>
               
               <div className="mt-2 text-[10px] text-slate-500 font-mono text-center">
-                  Total Valuation: ${((economics.valuation?.infrastructure_value || 0) + (economics.valuation?.intellectual_capital || 0)).toFixed(2)}
+                  Autonomy Level: FULL
               </div>
           </div>
           
-          <div className="glass-panel p-4 rounded-lg flex-1 flex flex-col justify-center items-center text-center">
-              <Shield className="w-12 h-12 text-cyan-500 opacity-80 mb-4" />
-              <h3 className="text-white font-bold tracking-widest">SENTINEL ACTIVE</h3>
-              <p className="text-xs text-slate-400 mt-2">Perimeter Secure.</p>
+          {/* ACTIVE OPERATIONS LIST INSTEAD OF "READY TO DROP" */}
+          <div className="glass-panel p-4 rounded-lg flex-1 overflow-hidden flex flex-col">
+              <h3 className="text-xs text-white font-bold mb-3">ACTIVE OPERATIONS</h3>
+              <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar">
+                  <div className="flex justify-between items-center text-[10px] bg-slate-900/50 p-2 rounded border-l-2 border-emerald-500">
+                      <span className="text-slate-300">ASSET_GEN_V1</span>
+                      <span className="text-emerald-500 font-bold">PUBLISHING</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] bg-slate-900/50 p-2 rounded border-l-2 border-yellow-500">
+                      <span className="text-slate-300">MARKET_SCAN</span>
+                      <span className="text-yellow-500 font-bold">RUNNING</span>
+                  </div>
+              </div>
           </div>
       </div>
 

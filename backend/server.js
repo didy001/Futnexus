@@ -26,6 +26,12 @@ if (!fs.existsSync(WORKSPACE_ROOT)) {
   fs.mkdirSync(WORKSPACE_ROOT, { recursive: true });
 }
 
+// Ensure logs directory exists for PM2
+const LOGS_ROOT = path.resolve('./logs');
+if (!fs.existsSync(LOGS_ROOT)) {
+  fs.mkdirSync(LOGS_ROOT, { recursive: true });
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -95,7 +101,7 @@ setInterval(() => {
 app.get('/nexus/status', (req, res) => {
   res.json({ 
     status: 'ONLINE', 
-    version: '9.0.0-OMEGA',
+    version: '11.0.0-CIEL-OMNIPOTENT',
     metrics: {
       uptime: process.uptime(),
       memory_rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
@@ -134,6 +140,16 @@ app.post('/nexus/ingest', async (req, res) => {
     }
 });
 
-server.listen(PORT, () => {
+const httpServer = server.listen(PORT, () => {
   logger.info(`Nexus Omega Core running on port ${PORT}`);
+});
+
+// --- GRACEFUL SHUTDOWN (PM2 COMPATIBILITY) ---
+process.on('SIGINT', () => {
+  logger.info('SIGINT received. Shutting down gracefully...');
+  httpServer.close(() => {
+    logger.info('HTTP server closed.');
+    // Close DB connections or other resources here if needed
+    process.exit(0);
+  });
 });

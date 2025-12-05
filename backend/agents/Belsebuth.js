@@ -51,7 +51,8 @@ export class Belsebuth extends BaseAgent {
             KEEP IT SIMPLE, FAST, AND ERROR-PROOF.
         `;
         
-        const generated = await super.run({ description: "Generate Agent Logic", specialized_prompt: prompt }, context);
+        // CRITICAL UPDATE: Using 'specialized_instruction' to enforce the prompt via BaseAgent
+        const generated = await super.run({ description: "Generate Agent Logic", specialized_instruction: prompt }, context);
         let codeBody = generated.output.text || generated.output;
         
         // Sanitize
@@ -82,8 +83,6 @@ export class Belsebuth extends BaseAgent {
     // --- MODE: REFACTOR (CLEANUP) ---
     if (payload.action === 'REFACTOR') {
         logger.info(`[BELSEBUTH] 🧹 Refactoring Target: ${payload.targetFile}`);
-        // Logic to read file, prompt LLM for optimization, and overwrite
-        // Placeholder for now, falls back to standard generation
         payload.description = `Read ${payload.targetFile}, analyze its weaknesses, and rewrite it to be Modular, Robust, and Efficient.`;
     }
 
@@ -126,9 +125,8 @@ export class Belsebuth extends BaseAgent {
   }
 
   _looksLikeBrokenCode(code) {
-      // Extremely basic heuristic check
       if (typeof code !== 'string') return true;
-      if (code.includes('```')) return false; // Markdown blocks are handled later usually, but inside content is bad
+      if (code.includes('```')) return false; 
       if (code.split('{').length !== code.split('}').length) return true; // Unbalanced braces
       return false;
   }

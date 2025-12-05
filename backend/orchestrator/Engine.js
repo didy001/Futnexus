@@ -5,6 +5,7 @@ import { simulacrum } from '../core/Simulacrum.js';
 import { armory } from '../core/Armory.js';
 import { realTimeCortex } from '../core/RealTimeCortex.js';
 import { aegis } from '../core/Aegis.js';
+import { intrusionCountermeasures } from '../core/IntrusionCountermeasures.js';
 import logger from '../core/logger.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -58,6 +59,30 @@ class OrchestratorEngine extends EventEmitter {
      this.startProcessingLoop();
   }
 
+  // --- AGENT INTERFACE COMPATIBILITY (OMEGA PATCH) ---
+  // Allows Workflow Engine to treat the Core Orchestrator as an "Agent" named CORE
+  // This enables recursive workflows where an agent can ask the Core to plan a sub-mission.
+  async run(payload, context = {}) {
+      const intentPayload = {
+          description: payload.description || "Direct Core Invocation",
+          payload: payload, // Pass raw payload
+          origin: "WORKFLOW_CORE_RECURSION",
+          priority: 100
+      };
+      
+      logger.info(`[ORCHESTRATOR] 🔄 Recursion: Core invoked as Agent for: ${payload.description}`);
+      const result = this.executeIntent(intentPayload);
+      
+      return { 
+          success: true, 
+          output: { 
+              status: "INTENT_QUEUED", 
+              queueId: result.queuePosition, 
+              message: "Core has accepted the recursive directive." 
+          } 
+      };
+  }
+
   async saveState() {
       try {
           const state = {
@@ -94,7 +119,6 @@ class OrchestratorEngine extends EventEmitter {
                   await this.processIntent(nextIntent);
               } catch (e) {
                   logger.error("[ORCHESTRATOR] 💥 Loop Crash prevented:", e);
-                  // Optional: Re-queue failed critical tasks?
               } finally {
                   this.isProcessing = false;
               }
@@ -118,7 +142,6 @@ class OrchestratorEngine extends EventEmitter {
       }
   }
 
-  // ... executeSwarm remains the same ...
   async executeSwarm(tasks, context) {
     let batchSize = 5; 
     logger.info(`[HYPER-SWARM] 🚀 Launching agents (Count: ${tasks.length})...`);
@@ -157,11 +180,25 @@ class OrchestratorEngine extends EventEmitter {
     const executionId = Date.now().toString();
     const context = { executionId, startTime: new Date(), armory };
     const trace = [];
+    const sourceKey = intentPayload.user_id || intentPayload.origin || 'ANON';
+
+    // --- GRADE 2 CHECK (SANDBOX) ---
+    if (intrusionCountermeasures.isSandboxed(sourceKey)) {
+        logger.info(`[ORCHESTRATOR] 🍯 Diverting COMPROMISED source ${sourceKey} to Honeypot.`);
+        const decoy = intrusionCountermeasures.getDecoyResponse(intentPayload.description);
+        this.emit('intent_completed', { executionId, result: decoy });
+        return;
+    }
 
     logger.info(`[ORCHESTRATOR] 🎬 Processing: ${intentPayload.description}`);
     realTimeCortex.emit('pipeline_start', { intent: intentPayload });
 
     try {
+        // --- GRADE 1: PARALLEL OBSERVATION ---
+        aegis.observe(sourceKey, intentPayload, context).catch(e => {
+            logger.warn(`[ORCHESTRATOR] 🛡️ Async Aegis warning: ${e.message}`);
+        });
+
         await aegis.governOutput('ORCHESTRATOR', 'INTENT_EXEC', intentPayload);
 
         const isWorkflow = intentPayload.payload?.action === 'DESIGN_WORKFLOW' 

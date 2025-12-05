@@ -79,7 +79,6 @@ class WorkflowEngine {
           case 'CODE_EXEC':
               // HARDENED SANDBOX
               const funcBody = node.parameters.code; 
-              // We block access to process, require, and global
               const safeEval = new Function('input', 'context', 'process', 'require', 'global', `
                   "use strict";
                   try { 
@@ -100,6 +99,34 @@ class WorkflowEngine {
                   description: prompt,
                   accept_text: true 
               });
+
+          case 'TRIGGER_BLUEPRINT':
+              // --- THE CIEL METABOLISM ---
+              // Automatically triggers a child workflow
+              const { orchestrator: orchRef } = await import('../orchestrator/Engine.js');
+              const bpId = node.parameters.blueprintId;
+              const inputs = node.parameters.inputs || {};
+              
+              // Resolve inputs
+              const resolvedInputs = {};
+              for (const [k, v] of Object.entries(inputs)) {
+                  resolvedInputs[k] = this._resolveTemplate(v, context);
+              }
+
+              logger.info(`[WORKFLOW] 🔗 CHAIN REACTION: Triggering ${bpId}`);
+              
+              // We execute it as a high-priority intent
+              orchRef.executeIntent({
+                  description: `CHAINED EXECUTION: ${bpId}`,
+                  origin: "WORKFLOW_CHAIN",
+                  priority: 95,
+                  payload: {
+                      action: "RUN_WORKFLOW",
+                      workflow: (await import('./BlueprintLibrary.js')).blueprintLibrary.getBlueprint(bpId)?.workflow
+                  }
+              });
+              
+              return { status: "CHAINED", target: bpId };
 
           case 'DELAY':
               const ms = node.parameters.ms || 1000;
@@ -134,7 +161,7 @@ class WorkflowEngine {
   }
 
   _resolveTemplate(str, context) {
-      if (!str) return str;
+      if (typeof str !== 'string') return str;
       return str.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
           const parts = key.split('.');
           let val = context;

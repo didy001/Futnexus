@@ -44,9 +44,18 @@ export class BaseAgent {
                 : "Standard toolset only.";
 
             // 3. Build System Prompt (Industrial Grade)
+            // CRITICAL FIX: Extract specialization from intent to override defaults
+            // This ensures Blueprints can override the agent's base persona
+            const specialization = intent.specialized_instruction || intent.specialized_prompt || "";
+
             const systemInstruction = `
                 IDENTITY: ${this.name} (NEXUS OMEGA MODULE)
-                ROLE: ${this.role}
+                
+                === ⚡ PRIMARY DIRECTIVE (HARD OVERRIDE) ⚡ ===
+                ${specialization ? "⚠️ PRIORITY ORDER: " + specialization : "FOLLOW STANDARD ROLE."}
+                ===============================================
+
+                STANDARD ROLE: ${this.role}
                 
                 === PROTOCOL: OMEGA PERFECT FORM ===
                 1. NO FLUFF. Output must be raw, actionable data.
