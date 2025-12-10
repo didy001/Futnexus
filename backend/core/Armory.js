@@ -10,7 +10,8 @@ import axios from 'axios';
 import { aegis } from './Aegis.js';
 import si from 'systeminformation';
 
-const execPromise = util.promisify(exec);
+// OMEGA FIX: Increase Max Buffer to 50MB to prevent crashes on large outputs (npm install, huge scans)
+const execPromise = util.promisify((cmd, opts, cb) => exec(cmd, { ...opts, maxBuffer: 1024 * 1024 * 50 }, cb));
 
 class Armory {
   constructor() {
@@ -20,6 +21,7 @@ class Armory {
       'NETWORK_SCAN': this.networkScan,
       'GIT_CLONE': this.gitClone,
       'NPM_INSTALL': this.npmInstall,
+      'SHELL_EXEC': this.shellExec, 
       'SEND_EMAIL': this.sendEmail,
       'TELEGRAM_MSG': this.sendTelegram,
       'DISCORD_WEBHOOK': this.sendDiscord,
@@ -28,14 +30,15 @@ class Armory {
       'KILL_PROCESS': this.killProcess,
       'SET_HIGH_PRIORITY': this.setHighPriority,
       'PURGE_BLOATWARE': this.purgeBloatware,
-      'FLUSH_SYSTEM_RAM': this.flushSystemRam
+      'FLUSH_SYSTEM_RAM': this.flushSystemRam,
+      'OPEN_APP': this.openApp
     };
   }
 
   async use(toolName, params) {
     logger.info(`[ARMORY] ⚔️ Engaging Tool: ${toolName}`);
     
-    // AEGIS GOVERNANCE
+    // AEGIS GOVERNANCE (Safety Check)
     try {
         await aegis.governOutput('ARMORY', toolName, params);
     } catch (securityError) {
@@ -49,18 +52,69 @@ class Armory {
     throw new Error(`Tool ${toolName} not found in Armory.`);
   }
 
-  // --- BASE TOOLS ---
+  // --- REAL SYSTEM TOOLS ---
+
+  async shellExec({ command, cwd }) {
+      logger.warn(`[ARMORY] ⚠️ RAW SHELL EXECUTION: ${command}`);
+      const { stdout, stderr } = await execPromise(command, { cwd: cwd || './workspace' });
+      return { stdout: stdout.trim(), stderr: stderr.trim() };
+  }
+
   async getSystemInfo() {
-    return { platform: os.platform(), cpus: os.cpus().length, memory_free: os.freemem(), uptime: os.uptime() };
+    try {
+        const cpu = await si.cpu();
+        const mem = await si.mem();
+        const osInfo = await si.osInfo();
+        
+        return { 
+            platform: `${osInfo.distro} ${osInfo.release}`, 
+            cpu_brand: cpu.brand,
+            cores: cpu.cores,
+            memory_total_gb: (mem.total / 1024 / 1024 / 1024).toFixed(1),
+            uptime_hours: (os.uptime() / 3600).toFixed(1)
+        };
+    } catch (e) {
+        return { platform: os.platform(), error: "Detailed stats unavailable" };
+    }
   }
 
   async listProcesses() {
-    const cmd = os.platform() === 'win32' ? 'tasklist' : 'ps aux --sort=-%mem | head -n 10';
-    const { stdout } = await execPromise(cmd);
-    return stdout;
+    try {
+        const list = await si.processes();
+        // Return top 15 by CPU usage to avoid flooding context
+        const top = list.list
+            .sort((a, b) => b.cpu - a.cpu)
+            .slice(0, 15)
+            .map(p => ({ pid: p.pid, name: p.name, cpu: p.cpu.toFixed(1), mem: p.mem.toFixed(1) }));
+        return JSON.stringify(top);
+    } catch (e) {
+        // Fallback for primitive environments
+        const cmd = os.platform() === 'win32' ? 'tasklist' : 'ps aux --sort=-%mem | head -n 10';
+        const { stdout } = await execPromise(cmd);
+        return stdout;
+    }
   }
 
-  async networkScan() { return os.networkInterfaces(); }
+  async networkScan() { 
+      const interfaces = os.networkInterfaces();
+      const summary = {};
+      for (const [name, nets] of Object.entries(interfaces)) {
+          summary[name] = nets.map(n => n.address);
+      }
+      return summary;
+  }
+
+  async openApp({ appName }) {
+      logger.info(`[ARMORY] 🚀 Launching: ${appName}`);
+      const cmd = os.platform() === 'win32' 
+          ? `start "" "${appName}"` 
+          : os.platform() === 'darwin' 
+             ? `open -a "${appName}"` 
+             : `xdg-open "${appName}"`; // Linux
+      
+      await execPromise(cmd);
+      return { status: "LAUNCHED", target: appName };
+  }
 
   async gitClone({ repoUrl, targetDir }) {
     if (!repoUrl) throw new Error("Repo URL required");
@@ -70,7 +124,8 @@ class Armory {
   }
 
   async npmInstall({ targetDir }) {
-    await execPromise('npm install', { cwd: targetDir });
+    const cwd = targetDir || './workspace';
+    await execPromise('npm install', { cwd });
     return { status: 'INSTALLED' };
   }
 
@@ -82,9 +137,9 @@ class Armory {
           const temp = await si.cpuTemperature();
           
           return {
-              cpu_load: load.currentLoad,
-              cpu_temp: temp.main,
-              ram_used_percent: (mem.active / mem.total) * 100,
+              cpu_load: Math.round(load.currentLoad),
+              cpu_temp: temp.main || "N/A",
+              ram_used_percent: Math.round((mem.active / mem.total) * 100),
               cores: load.cpus.length
           };
       } catch (e) {
@@ -94,14 +149,25 @@ class Armory {
   }
 
   async killProcess({ pid, name }) {
-      // DANGEROUS: AEGIS must check this.
-      if (!pid && !name) throw new Error("Target PID or Name required");
-      const cmd = process.platform === 'win32' 
-        ? `taskkill /F /PID ${pid}` 
-        : `kill -9 ${pid}`;
+      logger.warn(`[ARMORY] 💀 TERMINATION REQUEST: PID ${pid} / Name ${name}`);
       
-      await execPromise(cmd);
-      return { status: "TERMINATED", target: pid || name };
+      if (!pid && !name) throw new Error("Target PID or Name required");
+      
+      // Protection against suicide
+      if (pid == process.pid || name?.includes('node')) {
+          throw new Error("ARMORY SAFETY: Cannot kill Nexus Core.");
+      }
+
+      try {
+          const cmd = process.platform === 'win32' 
+            ? (pid ? `taskkill /F /PID ${pid}` : `taskkill /F /IM ${name}`) 
+            : (pid ? `kill -9 ${pid}` : `pkill -9 ${name}`);
+          
+          await execPromise(cmd);
+          return { status: "TERMINATED", target: pid || name };
+      } catch (e) {
+          return { status: "FAILED", error: e.message };
+      }
   }
 
   // --- TYRANT PROTOCOL (OS DOMINATION) ---
@@ -155,8 +221,6 @@ class Armory {
           } else if (os.platform() === 'darwin') {
               await execPromise('purge');
           } else {
-              // Windows doesn't have a direct CLI flush without external tools, 
-              // so we trigger a garbage collection on Node itself
               if (global.gc) global.gc();
           }
           return { status: "FLUSHED" };

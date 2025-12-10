@@ -1,5 +1,9 @@
+
 import { BaseAgent } from './BaseAgent.js';
 import logger from '../core/logger.js';
+import fs from 'fs/promises';
+import path from 'path';
+import { armory } from '../core/Armory.js';
 
 export class OmegaNode extends BaseAgent {
   constructor() {
@@ -16,7 +20,8 @@ export class OmegaNode extends BaseAgent {
       2. GENERATE_PM2: Create ecosystem.config.js for Bare Metal performance (Local/VPS).
       3. PROVISION_CLOUD: Generate deployment scripts (bash/ssh).
       4. DEPLOY_SATELLITE: Create configuration for a lightweight "Nexus Edge" node that connects back to Core.
-      5. DEPLOY_GRID_NODE: Create a Decentralized P2P Node configuration. This node does not rely on a central server but communicates via Mesh.
+      5. DEPLOY_GRID_NODE: Create a Decentralized P2P Node configuration.
+      6. EMERGENCY_ROTATE: Real System Hygiene (Hydra Protocol).
       
       OUTPUT:
       Always produce valid configuration files (YAML, JS, Bash) inside the output JSON 'files' array.
@@ -27,6 +32,46 @@ export class OmegaNode extends BaseAgent {
 
   async run(payload, context = {}) {
     logger.info(`[OMEGA NODE] ☁️ Designing Infrastructure...`);
+
+    // --- HYDRA PROTOCOL: REAL IDENTITY ROTATION ---
+    if (payload.action === 'EMERGENCY_ROTATE') {
+        logger.info(`[OMEGA NODE] 🔄 EXECUTING EMERGENCY ROTATION (REAL MODE).`);
+        
+        const operations = [];
+
+        // 1. Clear Browser Profile (Real Delete)
+        const profilePath = path.resolve('./workspace/browser_profile');
+        try {
+            await fs.rm(profilePath, { recursive: true, force: true });
+            operations.push("BROWSER_PROFILE_BURNED");
+            logger.info(`[OMEGA NODE] 🗑️ Burned browser profile.`);
+        } catch (e) {
+            operations.push("BROWSER_BURN_FAILED");
+        }
+
+        // 2. Flush DNS (Real Command)
+        try {
+            if (process.platform === 'win32') {
+                await armory.use('SHELL_EXEC', { command: 'ipconfig /flushdns' });
+            } else {
+                await armory.use('SHELL_EXEC', { command: 'sudo killall -HUP mDNSResponder' }); // Might fail without sudo
+            }
+            operations.push("DNS_FLUSHED");
+        } catch (e) {
+            operations.push("DNS_FLUSH_SKIPPED");
+        }
+
+        // 3. New Identity
+        return { 
+            success: true, 
+            output: { 
+                status: "ROTATED", 
+                ops: operations,
+                action: "IDENTITY_REFRESHED",
+                note: "System has shed its skin. Next NetRunner launch will generate fresh fingerprint."
+            } 
+        };
+    }
 
     // MODE LIGHTSPEED (PM2)
     if (payload.action === 'DEPLOY_BARE_METAL' || payload.mode === 'PERFORMANCE') {

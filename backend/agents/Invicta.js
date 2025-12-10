@@ -1,3 +1,4 @@
+
 import { BaseAgent } from './BaseAgent.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -17,7 +18,7 @@ export class Invicta extends BaseAgent {
       CAPABILITIES:
       - CREATE_SNAPSHOT
       - AUDIT_INTEGRITY
-      - HOLOGRAPHIC_SHARDING: Distribute backup fragments to prevent total data loss (Simulated decentralized storage).
+      - HOLOGRAPHIC_SHARDING: Distribute backup fragments.
       `,
       "gemini-2.5-flash"
     );
@@ -37,8 +38,21 @@ export class Invicta extends BaseAgent {
     }
 
     if (payload.action === 'AUDIT_INTEGRITY') {
-        // Mock integrity check
-        return { success: true, output: { status: "INTEGRAL", corrupted_sectors: [] } };
+        // REAL AUDIT
+        const kernelPath = path.resolve('./backend/kernel.json');
+        let status = "INTEGRAL";
+        let errors = [];
+
+        try {
+            await fs.access(kernelPath);
+            const content = await fs.readFile(kernelPath, 'utf8');
+            JSON.parse(content); // Test if valid JSON
+        } catch (e) {
+            status = "CORRUPTED";
+            errors.push("KERNEL_JSON_INVALID_OR_MISSING");
+        }
+
+        return { success: true, output: { status, corrupted_sectors: errors } };
     }
 
     // Default AI processing for complex resilience strategies
@@ -57,7 +71,7 @@ export class Invicta extends BaseAgent {
       
       // Backup Kernel configuration (Critical)
       // In a real scenario, we copy the actual kernel.json
-      const kernelPath = path.resolve('./kernel.json');
+      const kernelPath = path.resolve('./backend/kernel.json');
       try {
         const kernelData = await fs.readFile(kernelPath, 'utf8');
         await fs.writeFile(path.join(snapshotPath, 'kernel.backup.json'), kernelData);

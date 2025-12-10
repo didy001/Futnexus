@@ -1,3 +1,4 @@
+
 import { io, Socket } from 'socket.io-client';
 import { NexusStatus, SystemLog } from '../types';
 
@@ -6,6 +7,7 @@ const CORE_URL = "http://localhost:3000";
 class SocketService {
   private socket: Socket | null = null;
   private statusCallback: ((status: NexusStatus) => void) | null = null;
+  private interventionCallback: ((data: any) => void) | null = null;
 
   connect(onStatusUpdate: (status: NexusStatus) => void) {
     if (this.socket) return;
@@ -18,15 +20,22 @@ class SocketService {
     });
 
     this.socket.on('status_update', (data: any) => {
-       // Convert raw data to type if needed
        if(this.statusCallback) this.statusCallback(data);
     });
     
-    // Listen for log stream
-    this.socket.on('log_stream', (log: SystemLog) => {
-        // We handle this via the bulk status update for now, 
-        // but could append individually for lower latency
+    // Listen for Symbiote Intervention Requests
+    this.socket.on('intervention_required', (data: any) => {
+        if (this.interventionCallback) this.interventionCallback(data);
     });
+  }
+
+  onIntervention(callback: (data: any) => void) {
+      this.interventionCallback = callback;
+  }
+
+  // ALLOW DIRECT ACCESS FOR CUSTOM EVENTS (Anima Pulse)
+  getSocket() {
+      return this.socket;
   }
 
   disconnect() {

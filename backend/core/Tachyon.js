@@ -1,7 +1,7 @@
 
 import logger from './logger.js';
 import { cerebro } from './cerebro.js';
-import { mnemosyne } from './mnemosyne.js';
+import { realTimeCortex } from './RealTimeCortex.js';
 
 class Tachyon {
   constructor() {
@@ -9,32 +9,35 @@ class Tachyon {
   }
 
   async predictAndPreload(currentInput, userHistory) {
-    logger.info(`[TACHYON] ⚡ Accelerating Time... Predicting next probable intents.`);
-    
-    // 1. Analyze Pattern
+    // Only predict if input is substantial
+    if (!currentInput || currentInput.length < 5) return;
+
+    // 1. Analyze Pattern & Broadcast Prediction (Ghosting)
     const prompt = `
       USER INPUT: "${currentInput}"
       HISTORY: ${JSON.stringify(userHistory.slice(-3))}
       
-      TASK: Predict the next 3 most likely follow-up commands the user will give.
-      Example: If user asks "Scan BTC", next likely is "Analyze trends" or "Execute Trade".
+      TASK: Predict the SINGLE most likely completion or next command.
+      Be aggressive. Guess the user's will.
       
-      OUTPUT JSON: ["intent_1", "intent_2", "intent_3"]
+      OUTPUT: Just the predicted text string. No JSON.
     `;
 
     try {
-      const predictionRaw = await cerebro.think("gemini-2.5-flash", prompt, "You are a Precognitive Engine.");
-      const predictions = JSON.parse(predictionRaw.replace(/```json/g, '').replace(/```/g, '').trim());
+      // We use a "FAST" model for latency < 200ms
+      const prediction = await cerebro.think("FAST", prompt, "You are an Autocomplete Engine.");
+      
+      if (prediction && prediction.length > currentInput.length) {
+          logger.info(`[TACHYON] 🔮 Prediction: "${prediction}"`);
+          
+          // BROADCAST TO FRONTEND (The Ghost Text)
+          realTimeCortex.emit('tachyon_prediction', {
+              original: currentInput,
+              prediction: prediction,
+              confidence: 0.85
+          });
+      }
 
-      // 2. Pre-Calculate (Speculative Execution)
-      predictions.forEach(async (intent) => {
-        if (!this.cache.has(intent)) {
-           logger.info(`[TACHYON] 🔮 Speculating future: "${intent}"`);
-           // We perform a "Dry Run" - thinking but not acting physically
-           const thought = await cerebro.think("gemini-2.5-flash", intent, "Pre-compute response. Be concise.");
-           this.cache.set(intent, thought);
-        }
-      });
     } catch (e) {
       // Tachyon failure is silent
     }

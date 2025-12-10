@@ -1,6 +1,6 @@
+
 import { BaseAgent } from './BaseAgent.js';
 import { mnemosyne } from '../core/mnemosyne.js';
-import { skillForge } from '../core/SkillForge.js';
 import logger from '../core/logger.js';
 
 export class Metaquantique extends BaseAgent {
@@ -23,36 +23,16 @@ export class Metaquantique extends BaseAgent {
   // Analyzes a failure to prevent recurrence
   async critiqueFailure(error, context) {
     const analysis = await this.run({
-      task: "FAILURE_ANALYSIS",
+      action: "FAILURE_ANALYSIS",
       error: error,
       context: context
     });
     
     // Save the lesson
     if (analysis.output.lesson) {
-      await mnemosyne.learnLesson("SYSTEM_ERROR", analysis.output.lesson);
+      await mnemosyne.saveLongTerm("SYSTEM_LESSON", { lesson: analysis.output.lesson, tag: "FAILURE_ANALYSIS" });
     }
     return analysis;
-  }
-
-  // Analyzes a success to save Skills
-  async crystallize(trace) {
-    // Look for code generation steps that worked well
-    const buildStep = trace.find(t => t.agent === "BELSEBUTH" && t.success);
-    
-    if (buildStep && buildStep.output.files) {
-      for (const file of buildStep.output.files) {
-        // If it looks like a reusable utility/script, save to Forge
-        if (file.path.includes('utils') || file.path.includes('scripts')) {
-          await skillForge.learnSkill(
-            file.path.split('/').pop(), 
-            file.content, 
-            "Auto-learned from execution trace", 
-            ["auto-generated"]
-          );
-        }
-      }
-    }
   }
 
   async run(payload, context = {}) {
@@ -82,7 +62,7 @@ export class Metaquantique extends BaseAgent {
                     { "type": "SYSTEMIC", "strategy": "...", "prob": 0.85, "coherence": 0.9 },
                     { "type": "DEFENSIVE", "strategy": "...", "prob": 0.95, "coherence": 0.7 }
                 ],
-                "collapsed_choice": "SYSTEMIC" (The chosen optimal path)
+                "collapsed_choice": "SYSTEMIC" 
             }
         `;
     }

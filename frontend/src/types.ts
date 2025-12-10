@@ -113,3 +113,9 @@ export interface ChatMessage {
   timestamp: Date;
   sender?: string;
 }
+
+// Global App State Extension
+export interface UIState {
+    domainExpansion: boolean; // TRUE = ZEN MODE / GOD MODE
+    themeMode: 'DEFAULT' | 'WAR' | 'GOLD' | 'VOID';
+}

@@ -1,10 +1,14 @@
 import winston from 'winston';
+import { EventEmitter } from 'events';
 
-// In-memory buffer for the UI Dashboard
+// Event Emitter for Real-Time Streaming
+export const logEvents = new EventEmitter();
+
+// In-memory buffer for the UI Dashboard (History)
 const logBuffer = [];
 const MAX_LOGS = 100;
 
-// Custom Transport to feed the buffer
+// Custom Transport to feed the buffer and emit events
 class MemoryTransport extends winston.Transport {
   log(info, callback) {
     setImmediate(() => {
@@ -19,8 +23,12 @@ class MemoryTransport extends winston.Transport {
       message: info.message
     };
 
+    // 1. Buffer for history
     logBuffer.unshift(logEntry);
     if (logBuffer.length > MAX_LOGS) logBuffer.pop();
+
+    // 2. Emit for Real-Time Cortex
+    logEvents.emit('entry', logEntry);
 
     callback();
   }

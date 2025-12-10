@@ -6,17 +6,26 @@ import { armory } from '../core/Armory.js';
 import { realTimeCortex } from '../core/RealTimeCortex.js';
 import { aegis } from '../core/Aegis.js';
 import { intrusionCountermeasures } from '../core/IntrusionCountermeasures.js';
+import { stabilityCore } from '../modules/StabilityCore.js'; 
+import { generatorEcosystem } from '../modules/GeneratorEcosystem.js'; 
+import { anima } from '../core/Anima.js'; // Import Anima
 import logger from '../core/logger.js';
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ROBUST PATH HANDLING
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class OrchestratorEngine extends EventEmitter {
   constructor() {
-    super(); // Initialize Event Emitter
+    super(); 
     this.agents = {}; 
-    this.tracesDir = path.resolve('./workspace/traces');
-    this.agentsDir = path.resolve('./backend/agents');
-    this.stateFile = path.resolve('./workspace/engine_state.json');
+    this.workspaceDir = path.resolve('./workspace');
+    this.tracesDir = path.join(this.workspaceDir, 'traces');
+    this.agentsDir = path.join(__dirname, '..', 'agents');
+    this.stateFile = path.join(this.workspaceDir, 'engine_state.json');
     this.executionQueue = [];
     this.isProcessing = false;
   }
@@ -24,7 +33,7 @@ class OrchestratorEngine extends EventEmitter {
   async init() {
      try { await fs.mkdir(this.tracesDir, { recursive: true }); } catch (e) {}
      
-     // 1. RESURRECTION PROTOCOL (Load State)
+     // 1. RESURRECTION PROTOCOL
      await this.loadState();
 
      logger.info(`[GENESIS] 🧬 Scanning biological architecture in ${this.agentsDir}...`);
@@ -33,13 +42,19 @@ class OrchestratorEngine extends EventEmitter {
        for (const file of files) {
          if (file.endsWith('.js') && file !== 'BaseAgent.js') {
            const agentName = file.replace('.js', '');
+           
+           // DEDUPLICATION CHECK: Do not reload agents already injected via imports (like Hypnos/Anima)
+           if (this.agents[agentName.toUpperCase()]) {
+               logger.info(`[GENESIS] ⏭️ Skipping duplicate load for: ${agentName.toUpperCase()}`);
+               continue;
+           }
+
            try {
              const modulePath = `../agents/${file}?t=${Date.now()}`;
              const module = await import(modulePath);
              const AgentClass = module[agentName] || module.default;
-             if (AgentClass) {
+             if (AgentClass && typeof AgentClass === 'function') {
                this.agents[agentName.toUpperCase()] = new AgentClass();
-               // OMEGA: Ensure init is called
                if (this.agents[agentName.toUpperCase()].init) {
                    await this.agents[agentName.toUpperCase()].init();
                }
@@ -55,17 +70,14 @@ class OrchestratorEngine extends EventEmitter {
      }
      this.agents['CORE'] = this;
 
-     // START THE HEARTBEAT
      this.startProcessingLoop();
   }
 
-  // --- AGENT INTERFACE COMPATIBILITY (OMEGA PATCH) ---
-  // Allows Workflow Engine to treat the Core Orchestrator as an "Agent" named CORE
-  // This enables recursive workflows where an agent can ask the Core to plan a sub-mission.
+  // RECURSIVE INTERFACE
   async run(payload, context = {}) {
       const intentPayload = {
           description: payload.description || "Direct Core Invocation",
-          payload: payload, // Pass raw payload
+          payload: payload, 
           origin: "WORKFLOW_CORE_RECURSION",
           priority: 100
       };
@@ -111,19 +123,33 @@ class OrchestratorEngine extends EventEmitter {
   startProcessingLoop() {
       setInterval(async () => {
           if (this.executionQueue.length > 0 && !this.isProcessing) {
+              
+              // STABILITY CHECK
+              const health = stabilityCore.checkSystemHealth(this.executionQueue.length);
+              if (!health.stable) {
+                  if (health.action === 'PAUSE') await new Promise(r => setTimeout(r, health.duration));
+                  return; 
+              }
+
               this.isProcessing = true;
+              
+              // PRIORITY SORTING (God Tier first)
+              this.executionQueue.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
               const nextIntent = this.executionQueue.shift();
-              await this.saveState(); // Commit dequeue
+              await this.saveState(); 
               
               try {
                   await this.processIntent(nextIntent);
+                  stabilityCore.reportSuccess();
               } catch (e) {
                   logger.error("[ORCHESTRATOR] 💥 Loop Crash prevented:", e);
+                  stabilityCore.reportFailure();
               } finally {
                   this.isProcessing = false;
               }
           }
-      }, 500); // 2Hz Tick Rate
+      }, 500); 
   }
 
   async loadAgentFromFile(filePath) {
@@ -151,8 +177,18 @@ class OrchestratorEngine extends EventEmitter {
     for (let i = 0; i < tasks.length; i += batchSize) {
         const batch = tasks.slice(i, i + batchSize);
         const batchPromises = batch.map(async (task) => {
-            const agentName = task.agent || 'BELSEBUTH';
-            const agent = this.agents[agentName] || this.agents['BELSEBUTH'];
+            let agentName = task.agent || 'BELSEBUTH';
+            let agent = this.agents[agentName] || this.agents['BELSEBUTH'];
+            
+            // AUTO-EXPANSION CHECK
+            if (!this.agents[agentName] && agentName !== 'BELSEBUTH') {
+                logger.warn(`[ORCHESTRATOR] ⚠️ Agent ${agentName} missing. Invoking Generator Ecosystem.`);
+                const forged = await generatorEcosystem.handleMissingAgent(agentName, task.description);
+                if (forged) {
+                    agent = this.agents[agentName]; // Reload
+                }
+            }
+
             if (!agent) return { success: false, error: `Agent ${agentName} not found` };
             
             realTimeCortex.emitTrace(agentName, `START: ${task.description}`);
@@ -171,8 +207,14 @@ class OrchestratorEngine extends EventEmitter {
 
   executeIntent(intentPayload) {
       logger.info(`[ORCHESTRATOR] 📥 Intent Queued: ${intentPayload.description}`);
+      
+      // ANIMA HOOK: If Prime Directive, Align Willpower
+      if (intentPayload.origin === 'SHADOW_PRIME_DIRECTIVE') {
+          anima.setObsession(intentPayload.payload.strategy || intentPayload.description);
+      }
+
       this.executionQueue.push(intentPayload);
-      this.saveState(); // Persist enqueue
+      this.saveState(); 
       return { status: "QUEUED", queuePosition: this.executionQueue.length };
   }
 
@@ -182,7 +224,6 @@ class OrchestratorEngine extends EventEmitter {
     const trace = [];
     const sourceKey = intentPayload.user_id || intentPayload.origin || 'ANON';
 
-    // --- GRADE 2 CHECK (SANDBOX) ---
     if (intrusionCountermeasures.isSandboxed(sourceKey)) {
         logger.info(`[ORCHESTRATOR] 🍯 Diverting COMPROMISED source ${sourceKey} to Honeypot.`);
         const decoy = intrusionCountermeasures.getDecoyResponse(intentPayload.description);
@@ -194,7 +235,6 @@ class OrchestratorEngine extends EventEmitter {
     realTimeCortex.emit('pipeline_start', { intent: intentPayload });
 
     try {
-        // --- GRADE 1: PARALLEL OBSERVATION ---
         aegis.observe(sourceKey, intentPayload, context).catch(e => {
             logger.warn(`[ORCHESTRATOR] 🛡️ Async Aegis warning: ${e.message}`);
         });
@@ -229,7 +269,7 @@ class OrchestratorEngine extends EventEmitter {
              plan = { stages: [{ type: 'SEQUENTIAL', tasks: [{ description: intentPayload.description, agent: 'BELSEBUTH', ...intentPayload.payload }] }] };
         }
 
-        if (plan && plan.risk_level === 'HIGH') {
+        if (plan && plan.risk_level === 'HIGH' && intentPayload.origin !== 'SHADOW_PRIME_DIRECTIVE') {
             const riskCheck = await simulacrum.simulate(plan, context);
             if (!riskCheck.simulation_success) {
                 logger.error(`[ORCHESTRATOR] 🛑 Plan Rejected by Simulacrum.`);
@@ -254,7 +294,13 @@ class OrchestratorEngine extends EventEmitter {
             trace.push({ phase: 'EXECUTION', stage: stage.id, results: stageResults });
         }
 
-        await mnemosyne.saveLongTerm(`Execution ${executionId}`, { trace });
+        // SAVE TRACE TO MNEMOSYNE
+        await mnemosyne.saveLongTerm(`Execution Trace: ${intentPayload.description}`, { 
+            executionId, 
+            trace, 
+            status: "SUCCESS" 
+        });
+        
         realTimeCortex.emit('pipeline_complete', { executionId, status: 'SUCCESS' });
         this.emit('intent_completed', { executionId, trace });
 

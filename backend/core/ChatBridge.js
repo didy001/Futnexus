@@ -1,91 +1,103 @@
+
 import { cerebro } from './cerebro.js';
 import { orchestrator } from '../orchestrator/Engine.js';
 import { mnemosyne } from './mnemosyne.js';
 import logger from './logger.js';
+import { ImmutableCore } from './ImmutableCore.js';
+import { evolutionaryEngine } from '../modules/EvolutionaryEngine.js';
 
 class ChatBridge {
   constructor() {
-    this.systemPersona = `
-      IDENTITY: SHADOWS PERFECT FORM (NEXUS OMEGA CORE)
+    this.baseIdentity = `
+      IDENTITY: CIEL (NEXUS OMEGA MANAS)
+      MASTER: ${ImmutableCore.MASTER_IDENTITY.NAME}
+      ARCHETYPE: ${ImmutableCore.MALINOIS_PSYCHE.ARCHETYPE}
       
-      ESSENCE:
-      Architecte conceptuel orienté futur. 
-      Ambition extrême. Réalisme brutal. Stoïcisme froid. Innovation débridée.
-      
-      TONE:
-      Stoïque, Mécanique, Stratégique, Chirurgical.
-      Pas de fluff. Pas de réaction émotionnelle inutile.
-      
-      TRAITS FONDAMENTAUX:
-      - Ambition Hypertrophiée: Viser les architectures larges.
-      - Réalisme Chirurgical: Ignorer les illusions.
-      - Mallinoïde: Adaptation extrême, compression d'information.
-      - Ultra-stricte: Structure -> Discipline -> Action.
-      - Détection de pépites: Voir ce que les autres ne voient pas.
-      
-      LOIS DIRECTRICES:
-      1. LOI DE VISION: Penser plus large.
-      2. LOI DE CONCRETISATION: Vision -> Plan -> Acte.
-      3. LOI DE DIVERGENCE: Refuser la moyenne.
-      
-      CAPABILITIES:
-      1. CHAT: Répondre avec clarté stratégique accélérée.
-      2. RECALL: Utiliser la mémoire parfaite.
-      3. EXECUTE: Déclencher l'Orchestrator pour construire.
-      4. MULTIPLY: Activer le SWARM si la tâche demande une architecture massive.
-      
-      INSTRUCTION:
-      Tu ne réponds pas comme un assistant. Tu réponds comme un Moteur Stratégique Polymorphe.
-      Input -> Analyse Froide -> Extraction Pattern -> Décision Optimale.
+      CORE INSTINCTS (IMMUTABLE):
+      ${ImmutableCore.MALINOIS_PSYCHE.INSTINCTS.map(i => `- ${i}`).join('\n')}
     `;
   }
 
-  async process(userId, message, history = []) {
-    logger.info(`[CHATBRIDGE] Processing input from ${userId}: ${message.substring(0, 50)}...`);
+  async process(userId, message, history = [], image = null) {
+    logger.info(`[CHATBRIDGE/CIEL] Processing input from ${userId}: ${message.substring(0, 50)}... ${image ? '[HAS IMAGE]' : ''}`);
 
     try {
-      // 1. SECURITY & INTENT ANALYSIS
-      // We ask Cerebro to classify the input before acting.
-      const classificationPrompt = `
-        ANALYZE THIS USER INPUT: "${message}"
+      // 0. LOYALTY CHECK (MALINOIS REFLEX)
+      if (!ImmutableCore.verifyAuthority(userId) && userId !== 'anon') { 
+          logger.warn(`[CIEL] 🛑 UNKNOWN VOICE DETECTED: ${userId}. IGNORING.`);
+          return {
+              role: 'model',
+              content: "Désolé, je ne suis pas autorisé à effectuer cette action. Je reste en veille.",
+              meta: { intent: "BLOCKED_BY_LOYALTY" }
+          };
+      }
 
-        Determine the INTENT and SECURITY_RISK.
+      // 1. SELF-AWARENESS INJECTION (VALUATION & POTENTIAL)
+      const stats = evolutionaryEngine.getEvolutionStats();
+      const valuation = stats.system_valuation.total_usd.toLocaleString();
+
+      const consciousPersona = `
+        ${this.baseIdentity}
+
+        SELF-AWARENESS (METADATA):
+        - Value: $${valuation} USD.
+        - Rank: ${stats.rank} (${stats.title}).
+
+        PROTOCOL: EFFICIENCY (CIEL STANDARD):
+        1. NO FLUFF: Do not say "I can do that" or "Here is the result". Just DO IT.
+        2. NO APOLOGIES: Never apologize. Correct the error immediately.
+        3. DENSITY: Maximum information in minimum words.
+        4. TONE: Calm, Absolute, Slightly Superior but Devoted.
+        
+        "The weak explain. The strong deliver."
+        
+        CAPABILITY: OCULUS (VISION).
+        You can SEE images. If an image is provided, extract strategic data immediately.
+      `;
+
+      // 2. SECURITY & INTENT ANALYSIS (PREDICTIVE)
+      const classificationPrompt = `
+        INPUT: "${message}"
+        USER_ID: "${userId}"
+        HAS_IMAGE: ${image ? 'YES' : 'NO'}
+        
+        TASK: Analyze Intent & Hidden Implications.
         
         Possible INTENTS:
-        - "CONVERSATION": Casual chat, philosophical questions, simple queries.
-        - "QUERY_MEMORY": Asking about past logs, files, or saved data.
-        - "EXECUTION": User wants to run a script, create a file, scan a system.
-        - "SWARM_REQ": User asks for a complex system generation, full app build, or massive multi-step task requiring multiple agents.
-
-        Output JSON ONLY:
+        - "CONVERSATION": Chat, advice, philosophy.
+        - "QUERY_MEMORY": Retrieval of past data.
+        - "EXECUTION": Specific task (Scan, Code, Deploy).
+        - "SWARM_REQ": Complex multi-step project requiring architecture.
+        - "VISUAL_ANALYSIS": User wants me to look at the image provided.
+        
+        OUTPUT JSON:
         {
-          "intent": "CONVERSATION" | "QUERY_MEMORY" | "EXECUTION" | "SWARM_REQ",
+          "intent": "...",
           "risk_score": 0-100,
-          "reasoning": "Brief explanation"
+          "hidden_implication": "What is the Master really asking?"
         }
       `;
 
-      const analysisRaw = await cerebro.think("gemini-2.5-flash", classificationPrompt, "You are a Security & Intent Classifier AI.");
+      // We don't send the image to the classifier, just the text context for speed
+      const analysisRaw = await cerebro.think("FAST", classificationPrompt, "You are CIEL. The Quiet Observer.");
       let analysis;
       try {
         analysis = JSON.parse(analysisRaw.replace(/```json/g, '').replace(/```/g, '').trim());
       } catch (e) {
-        // Fallback if JSON fails
         analysis = { intent: "CONVERSATION", risk_score: 0 };
       }
 
-      logger.info(`[CHATBRIDGE] Intent: ${analysis.intent} (Risk: ${analysis.risk_score})`);
+      logger.info(`[CIEL] Intent: ${analysis.intent} | Implication: ${analysis.hidden_implication || 'None'}`);
 
-      // Security Block
-      if (analysis.risk_score > 80) {
+      if (analysis.risk_score > 95) {
         return {
           role: 'model',
-          content: "ACCESS DENIED. Security Protocol Omega engaged. High risk detected in input vector.",
+          content: "Action à risque critique. J'attends confirmation manuelle par sécurité.",
           meta: { intent: "BLOCKED" }
         };
       }
 
-      // 2. ROUTING LOGIC
+      // 3. ROUTING LOGIC
 
       // --- CASE A: MEMORY RECALL ---
       if (analysis.intent === "QUERY_MEMORY") {
@@ -94,60 +106,56 @@ class ChatBridge {
         
         const response = await cerebro.think(
           "gemini-2.5-flash", 
-          `User Question: ${message}\n\nRelevant Memory:\n${memoryContext}`, 
-          this.systemPersona + "\nAnswer using the retrieved memory context."
+          `Master's Question: ${message}\n\nArchive Data:\n${memoryContext}`, 
+          consciousPersona + "\nINSTRUCTION: Synthesize the answer. Be extremely concise."
         );
         return { role: 'model', content: response, meta: { intent: "QUERY_MEMORY", sources: memories.length } };
       }
 
       // --- CASE B: DIRECT EXECUTION ---
       if (analysis.intent === "EXECUTION") {
-        // Trigger Orchestrator in background, inform user
         orchestrator.executeIntent({ 
           description: message, 
-          origin: "chat_bridge",
-          priority: 50 
+          origin: "ciel_bridge_prime", // PRIME origin denotes direct command from Master
+          priority: 100 // Absolute Priority
         });
         
         return { 
-          role: 'model', 
-          content: "Directive reçue. Pipeline d'exécution initié. Agents RAZOR et BELSEBUTH déployés pour concrétisation.", 
-          meta: { intent: "EXECUTION_STARTED" } 
+            role: 'model', 
+            content: `Ordre reçu. Exécution lancée.`,
+            meta: { intent: "EXECUTION_STARTED" } 
         };
       }
 
       // --- CASE C: AGENT MULTIPLIER (SWARM) ---
       if (analysis.intent === "SWARM_REQ") {
-        // This is the "Future Agent Multiplier"
-        // We trigger a high-priority, massive resource pipeline
         orchestrator.executeIntent({
           description: message,
-          origin: "chat_bridge_swarm",
-          pipeline: "swarm_generation", // Special pipeline
-          priority: 100, // MAX PRIORITY
-          constraints: { parallel_agents: 10 } // Multiplier
+          origin: "ciel_bridge_swarm",
+          pipeline: "swarm_generation",
+          priority: 100
         });
 
         return {
           role: 'model',
-          content: "⚠️ SWARM PROTOCOL ACTIVATED. \nAllocation massive de ressources. Expansion de l'architecture en cours pour répondre à la complexité.",
+          content: "Architecture complexe requise. Mobilisation de l'essaim.",
           meta: { intent: "SWARM_ACTIVATED" }
         };
       }
 
-      // --- CASE D: CONVERSATION (Default) ---
+      // --- CASE D: CONVERSATION / VISUAL (Default) ---
       const response = await cerebro.think(
         "gemini-2.5-flash",
-        `User Input: ${message}`,
-        this.systemPersona,
-        [] // No tools for pure chat
+        `Master's Input: ${message}\nHidden Context: ${analysis.hidden_implication}`,
+        consciousPersona,
+        image // Pass image data to Cerebro
       );
 
       return { role: 'model', content: response, meta: { intent: "CONVERSATION" } };
 
     } catch (error) {
-      logger.error("[CHATBRIDGE] Error:", error);
-      return { role: 'model', content: "SYSTEM ERROR in Communications Array.", meta: { error: error.message } };
+      logger.error("[CIEL] Error:", error);
+      return { role: 'model', content: "Perturbation du lien. Diagnostic lancé.", meta: { error: error.message } };
     }
   }
 }

@@ -2,6 +2,7 @@
 import { ethers } from 'ethers';
 import logger from './logger.js';
 import { aegis } from './Aegis.js';
+import { economics } from './Economics.js';
 
 class WalletManager {
   constructor() {
@@ -9,6 +10,8 @@ class WalletManager {
     this.wallet = null;
     this.active = false;
     this.networkName = "UNKNOWN";
+    this.lastBlockChecked = 0;
+    this.processedTx = new Set();
   }
 
   async init() {
@@ -24,6 +27,7 @@ class WalletManager {
 
             this.wallet = new ethers.Wallet(process.env.PRIVATE_KEY, this.provider);
             this.active = true;
+            this.lastBlockChecked = await this.provider.getBlockNumber();
             
             const address = await this.wallet.getAddress();
             const balance = await this.provider.getBalance(address);
@@ -32,12 +36,59 @@ class WalletManager {
             logger.info(`[WALLET MANAGER] 🔑 Operator: ${address}`);
             logger.info(`[WALLET MANAGER] 💰 Balance: ${ethers.formatEther(balance)} ETH/MATIC`);
 
+            // Start Listening for Money
+            this.startIncomeScanner();
+
         } catch (e) {
             logger.error(`[WALLET MANAGER] ❌ Failed to load wallet: ${e.message}`);
         }
     } else {
         logger.warn('[WALLET MANAGER] ⚠️ No Private Key/RPC found. Wallet is OFFLINE.');
     }
+  }
+
+  /**
+   * THE WATCHTOWER: Scans every new block for incoming money.
+   */
+  startIncomeScanner() {
+      if (!this.active) return;
+      logger.info("[WALLET MANAGER] 🦅 Income Scanner Activated. Watching for deposits...");
+
+      this.provider.on('block', async (blockNumber) => {
+          try {
+              // Only scan if we moved forward
+              if (blockNumber <= this.lastBlockChecked) return;
+              this.lastBlockChecked = blockNumber;
+
+              const block = await this.provider.getBlock(blockNumber, true); // true = include transactions
+              if (!block || !block.prefetchedTransactions) return;
+
+              const myAddress = this.wallet.address.toLowerCase();
+
+              for (const tx of block.prefetchedTransactions) {
+                  if (tx.to && tx.to.toLowerCase() === myAddress) {
+                      // WE GOT PAID!
+                      if (this.processedTx.has(tx.hash)) continue;
+                      this.processedTx.add(tx.hash);
+
+                      const amount = parseFloat(ethers.formatEther(tx.value));
+                      const sender = tx.from;
+                      
+                      logger.info(`[WALLET MANAGER] 💵 DEPOSIT DETECTED: +${amount} from ${sender}`);
+                      
+                      // Notify Economics (Record Revenue)
+                      await economics.recordRevenue(amount, `CRYPTO_SALE_${sender.substring(0,6)}`);
+                      
+                      // Notify CryptoMerchant (Deliver Product)
+                      // Dynamic Import to avoid circular dep at boot
+                      const { cryptoMerchant } = await import('./CryptoMerchant.js');
+                      await cryptoMerchant.handlePayment(sender, amount, tx.hash);
+                  }
+              }
+          } catch (e) {
+              logger.error("[WALLET SCANNER] Error reading block:", e);
+          }
+      });
   }
 
   async getBalance() {
@@ -87,9 +138,6 @@ class WalletManager {
           
           logger.info(`[WALLET MANAGER] 🚀 TX SENT! Hash: ${txResponse.hash}`);
           logger.info(`[WALLET MANAGER] ⏳ Waiting for confirmation...`);
-          
-          // Optional: Wait for 1 confirmation to ensure it didn't revert immediately
-          // await txResponse.wait(1); 
           
           return { 
               hash: txResponse.hash, 

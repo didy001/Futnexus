@@ -13,11 +13,13 @@ export class Lucifer extends BaseAgent {
       CAPABILITY UPGRADE (OMEGA): 
       - WEB_WALKER (Fast, Static Reading)
       - NET_RUNNER (Headless Browser, Screenshots, Interaction)
+      - ANALYZE_AESTHETICS (Visual Intelligence)
       
       YOUR ROLE:
       1. Analyze the intent.
       2. If it's simple reading -> Use WEB_WALKER.
       3. If it requires login, screenshot, or complex JS -> Use NET_RUNNER.
+      4. If it asks for Design Inspiration -> Use ANALYZE_AESTHETICS.
       
       OUTPUT JSON:
       {
@@ -32,6 +34,37 @@ export class Lucifer extends BaseAgent {
   }
 
   async run(payload, context = {}) {
+    // --- OMEGA: VISUAL INTELLIGENCE ---
+    if (payload.action === 'ANALYZE_AESTHETICS') {
+        const targetUrl = payload.target_url;
+        logger.info(`[LUCIFER] 🎨 Analyzing Visual DNA of: ${targetUrl}`);
+        
+        // 1. Get Visual Proof
+        const scan = await netRunner.scriptConnect(targetUrl, { screenshot: true });
+        
+        if (!scan.success) return { success: false, error: "Failed to visualize target." };
+
+        // 2. Analyze (Simulated Visual processing via LLM text extraction context)
+        // In a multimodal setup, we would send the image. Here we use DOM structure.
+        payload.specialized_instruction = `
+            TASK: Reverse-Engineer the Design System of this page.
+            CONTENT DUMP: ${scan.extracted_text.substring(0, 2000)}...
+            
+            INSTRUCTION:
+            Based on the CSS classes and text structure, deduce:
+            1. Color Vibe (Dark/Light, Neon/Corporate?)
+            2. Typography (Serif/Sans? Modern/Classic?)
+            3. Layout Structure (Grid/Hero?)
+            
+            OUTPUT JSON:
+            {
+                "vibe": "...",
+                "suspected_colors": ["..."],
+                "layout_type": "..."
+            }
+        `;
+    }
+
     // 1. Detect URL
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const urls = payload.description.match(urlRegex);

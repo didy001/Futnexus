@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NexusStatus } from '../types';
 import { NexusClient } from '../services/nexusClient';
-import { Send, Mic, MicOff, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { Send, Mic, MicOff, Volume2, VolumeX, Sparkles, FileCode, Terminal, AlertOctagon, CheckCircle } from 'lucide-react';
 
 interface OmniShellProps {
   status: NexusStatus;
@@ -10,21 +10,18 @@ interface OmniShellProps {
 
 const OmniShell: React.FC<OmniShellProps> = ({ status }) => {
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<{role: string, content: string}[]>([]);
+  const [history, setHistory] = useState<{role: string, content: string, meta?: any}[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
-  // Re-implementing minimalist versions of hooks for brevity in visual update
   const speak = (text: string) => { 
       if(!isMuted) {
           try {
               const utterance = new SpeechSynthesisUtterance(text);
               window.speechSynthesis.speak(utterance);
-          } catch(e) {
-              // Ignore not-allowed error
-          }
+          } catch(e) { /* ignore */ }
       } 
   };
   const toggleListening = () => { setIsListening(!isListening); };
@@ -38,7 +35,7 @@ const OmniShell: React.FC<OmniShellProps> = ({ status }) => {
     
     const response = await NexusClient.sendCommand(cmd, history);
     
-    setHistory(prev => [...prev, { role: response.role, content: response.content }]);
+    setHistory(prev => [...prev, { role: response.role, content: response.content, meta: response.meta }]);
     setIsThinking(false);
     
     if (response.role === 'model' && response.content) {
@@ -49,6 +46,51 @@ const OmniShell: React.FC<OmniShellProps> = ({ status }) => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history]);
+
+  // RENDER ACTION CARDS
+  const renderActionCard = (meta: any) => {
+      if (!meta) return null;
+
+      // FILE CREATION CARD
+      if (meta.files && meta.files.length > 0) {
+          return (
+              <div className="mt-4 bg-emerald-900/20 border border-emerald-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                      <FileCode className="w-4 h-4" />
+                      <span className="text-xs font-bold font-mono">ARTIFACTS GENERATED</span>
+                  </div>
+                  <div className="space-y-1">
+                      {meta.files.map((file: string, i: number) => (
+                          <div key={i} className="text-[10px] font-mono text-emerald-200 bg-emerald-950/50 px-2 py-1 rounded flex items-center justify-between group cursor-pointer hover:bg-emerald-900/50">
+                              <span>{file}</span>
+                              <CheckCircle className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                          </div>
+                      ))}
+                  </div>
+                  <div className="mt-2 text-[10px] text-emerald-500/60 font-mono">
+                      Saved to local workspace.
+                  </div>
+              </div>
+          );
+      }
+
+      // SYSTEM ACTION CARD (e.g. Process Killed)
+      if (meta.intent === 'EXECUTION_STARTED' || meta.intervention) {
+           return (
+              <div className="mt-4 bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-purple-400 mb-2">
+                      <Terminal className="w-4 h-4" />
+                      <span className="text-xs font-bold font-mono">SYSTEM EXECUTION</span>
+                  </div>
+                  <div className="text-xs font-mono text-purple-200">
+                      Command sent to Core Orchestrator. Monitoring execution...
+                  </div>
+              </div>
+           );
+      }
+
+      return null;
+  };
 
   return (
     <div className="w-full h-full flex flex-col relative">
@@ -79,9 +121,15 @@ const OmniShell: React.FC<OmniShellProps> = ({ status }) => {
                             <><div className="w-1 h-1 bg-cyan-400 rounded-full"></div> NOTICE</>
                         )}
                     </div>
+                    
+                    {/* MESSAGE CONTENT */}
                     <div className="font-mono text-sm leading-7 whitespace-pre-wrap">
                         {msg.content}
                     </div>
+
+                    {/* ACTION CARD RENDERER */}
+                    {renderActionCard(msg.meta)}
+
                 </div>
             </div>
         ))}

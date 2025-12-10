@@ -2,6 +2,7 @@
 import { BaseAgent } from './BaseAgent.js';
 import logger from '../core/logger.js';
 import { blueprintLibrary } from '../core/BlueprintLibrary.js';
+import { stoicPlanner } from '../modules/StoicPlanner.js';
 
 export class Razor extends BaseAgent {
   constructor() {
@@ -9,6 +10,7 @@ export class Razor extends BaseAgent {
       "RAZOR", 
       `Operational Planner & Swarm Orchestrator. 
       Your job is to break down intents into atomic steps or workflows.
+      OUTPUT JSON format is MANDATORY.
       `,
       "gemini-2.5-flash"
     );
@@ -26,30 +28,30 @@ export class Razor extends BaseAgent {
               logger.info(`[RAZOR] ⚡ Blueprint Found: ${existingBlueprint.name}`);
               return {
                   success: true,
-                  output: existingBlueprint.workflow // Return the hardcoded, perfected graph
+                  output: existingBlueprint.workflow 
               };
           } else {
               logger.info(`[RAZOR] ⚠️ No exact blueprint found. Initiating custom design protocol.`);
           }
           
-          // Fallback to LLM design (Standard Razor behavior)
+          // Fallback to LLM design
           payload.specialized_instruction = `
               TASK: Design a complete executable Workflow Graph.
               INTENT: ${description}
-              
-              AVAILABLE NODE TYPES:
-              - START
-              - HTTP_REQUEST (params: url, method, body)
-              - AGENT_PROMPT (params: agent, prompt)
-              - CODE_EXEC (params: code - js body returning output)
-              - DECISION (Logic gate)
-              - DELAY (params: ms)
-              
-              INSTRUCTION:
-              Return the JSON structure with 'nodes' and 'edges'.
+              AVAILABLE NODE TYPES: START, HTTP_REQUEST, AGENT_PROMPT, CODE_EXEC, DECISION, DELAY, TRIGGER_BLUEPRINT.
+              INSTRUCTION: Return JSON with 'nodes' (array) and 'edges' (array).
           `;
       }
 
-      return super.run(payload, context);
+      // 2. STANDARD PLAN GENERATION (Using Base Agent)
+      const result = await super.run(payload, context);
+
+      // 3. MODULE 2: STOIC PLANNER VALIDATION
+      // We filter the output through the Stoic Logic before returning it
+      if (result.success && result.output && result.output.stages) {
+          result.output = stoicPlanner.validatePlan(result.output);
+      }
+
+      return result;
   }
 }

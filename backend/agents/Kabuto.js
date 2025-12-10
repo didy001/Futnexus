@@ -3,6 +3,7 @@ import { BaseAgent } from './BaseAgent.js';
 import logger from '../core/logger.js';
 import { walletManager } from '../core/WalletManager.js';
 import { economics } from '../core/Economics.js';
+import { evolutionaryEngine } from '../modules/EvolutionaryEngine.js';
 
 export class Kabuto extends BaseAgent {
   constructor() {
@@ -24,13 +25,15 @@ export class Kabuto extends BaseAgent {
       "gemini-2.5-flash"
     );
     
-    // SAFETY CONFIGURATION
-    this.dailyLimit = 50.0; // USD (System Limit)
     this.spentToday = 0.0;
     this.lastReset = Date.now();
   }
 
   async run(payload, context = {}) {
+    // Dynamic Daily Limit based on Evolution Rank
+    const perks = evolutionaryEngine.getPerks();
+    const dailyLimit = perks.spending_limit_daily;
+
     // Daily Limit Reset
     if (Date.now() - this.lastReset > 86400000) {
         this.spentToday = 0;
@@ -61,10 +64,6 @@ export class Kabuto extends BaseAgent {
                 data: "NEXUS TRIBUTE DIVIDEND"
             });
             
-            // Record the withdrawal in Ledger
-            // Note: WalletManager sends, Economics records. 
-            // In a perfect system, Economics triggers WalletManager, but here we sync.
-            
             return { success: true, output: { status: "PAID", txn: txResult } };
         } catch (e) {
             logger.error("[KABUTO] Tribute Payment Failed:", e);
@@ -75,7 +74,7 @@ export class Kabuto extends BaseAgent {
     // --- MODE: AUDIT EXPENSE (SYSTEM SPENDING) ---
     if (payload.action === 'AUDIT_TRANSACTION') {
         const { amount, recipient, purpose, origin } = payload.transaction;
-        logger.info(`[KABUTO] 🛡️ Auditing Request: ${amount} for [${purpose}] by ${origin}`);
+        logger.info(`[KABUTO] 🛡️ Auditing Request: ${amount} for [${purpose}] by ${origin} (Limit: ${dailyLimit})`);
 
         // 0. SOLVENCY CHECK (The Iron Bank Guard)
         const stats = economics.getStats();
@@ -87,9 +86,9 @@ export class Kabuto extends BaseAgent {
             };
         }
 
-        // 1. HARD LIMIT CHECK
-        if (this.spentToday + amount > this.dailyLimit) {
-            logger.warn(`[KABUTO] 🛑 DAILY SYSTEM LIMIT EXCEEDED.`);
+        // 1. HARD LIMIT CHECK (EVOLUTIONARY SCALED)
+        if (this.spentToday + amount > dailyLimit) {
+            logger.warn(`[KABUTO] 🛑 DAILY SYSTEM LIMIT EXCEEDED ($${this.spentToday}/${dailyLimit}). EVOLVE TO INCREASE.`);
             return { 
                 success: true, 
                 output: { approved: false, reason: "DAILY_LIMIT_EXCEEDED" } 
@@ -112,12 +111,10 @@ export class Kabuto extends BaseAgent {
 
         if (riskDecision.approved && riskDecision.risk_score < 30) {
             
-            // Try to register in Ledger (This will fail if race condition emptied treasury)
             const ledgerSuccess = await economics.registerExpense(amount, purpose);
             
             if (ledgerSuccess) {
                 this.spentToday += amount;
-                // Execute Real Transaction
                 try {
                     const tx = await walletManager.signTransaction({ 
                         to: recipient, 
